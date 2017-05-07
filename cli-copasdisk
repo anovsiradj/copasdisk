@@ -124,7 +124,7 @@ class CopasDisk
 		}
 
 		if (!@copy($source, $destination)) {
-			$this->log_info(sprintf('Failed to copy from "%s" to "%s". I don\'t know why', $source, $destination));
+			$this->log_info(sprintf('Failed to copy from "%s" to "%s". Probably permission problem', $source, $destination));
 		}
 	}
 
