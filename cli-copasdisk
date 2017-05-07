@@ -1,0 +1,257 @@
+#!/usr/bin/env php
+<?php
+class CopasDisk
+{
+	const VERSION = '1.0.0';
+
+	public $opts_source = array('-s', '--source');
+	public $opts_target = array('-t', '--target');
+	public $opts_special = array('--help', '--version');
+	public $opts;
+
+	public $copas_ignore = array('.', '..');
+	public $copas_full_ignore = array();
+
+	public $source = array(); // source(s)
+	public $target; // target
+
+	public $requests;
+
+	function __construct($requests = array()) {
+		// 1st (0) param is this file itself
+		array_shift($requests);
+
+		$this->requests = $requests;
+		$this->opts = array_merge($this->opts_source, $this->opts_target);
+
+		$this->validate_is_cli();
+	}
+	public function validate_is_cli()
+	{
+		$sapi = php_sapi_name();
+		if (empty($sapi)) {
+			// happen when run: php ./filename ; from terminal. tested on (with permission not allow execution as program and file have hasbang):
+			/*
+			PHP 7.0.15-0ubuntu0.16.04.4 (cli) ( NTS )
+			Copyright (c) 1997-2017 The PHP Group
+			Zend Engine v3.0.0, Copyright (c) 1998-2017 Zend Technologies with Zend OPcache v7.0.15-0ubuntu0.16.04.4, Copyright (c) 1999-2017, by Zend Technologies
+			*/
+			$sapi = 'undefined';
+		}
+		$is_cli = substr($sapi, 0, 3) === 'cli';
+		// $is_cli = false;
+
+		if ($is_cli) {
+			$this->validate_requests();
+		} else {
+			$this->log_error(sprintf('Forbidden SAPI interface (%s). Only CLI allowed.', $sapi));
+		}
+	}
+
+	public function validate_requests()
+	{
+		$type_opt = null;
+		foreach ($this->requests as $request) {
+			if ($this->is_optly($request)) {
+				$type_opt = $request;
+			} elseif ($this->set_opt_by_type($type_opt, $request) === false) {
+				$this->log_error(sprintf('Not found option with key "%s" (trying set value to "%s")', $type_opt, $request));
+			}
+			/*
+			if ($type_opt === null) {
+				if (in_array($request, $this->opts)) {
+					$type_opt = $request;
+				} else {
+					$this->log_error(sprintf('Unknown first-option key "%s"', $request));
+				}
+				continue;
+			}
+
+			if (in_array($request, $this->opts)) {
+				$type_opt = $request;
+			} else {
+				if ($this->is_optly($request)) {
+					$type_opt = $request;
+				} elseif ($this->set_opt_by_type($type_opt, $request) === false) {
+					$this->log_error(sprintf('Not found option with key "%s" (trying set value to "%s")', $type_opt, $request));
+				}
+			}
+			*/
+		} // endforeach
+
+		if (!isset($this->target)) $this->log_error('Target is not set');
+
+		if (count($this->source) < 1) $this->log_error('Source is empty');
+
+		$this->validate_contents();
+	}
+
+	public function validate_contents()
+	{
+		// $this->execute_target();
+
+		foreach ($this->source as $source) {
+			$this->log('Copying: ', $source, ' => ', $this->source2target_path($source));
+			$this->copas($source);
+		}
+	}
+
+	public function execute_target()
+	{
+		if (file_exists($this->target) && is_dir($this->target)) {
+			$this->log_info(sprintf('Target "%s" Ok', realpath($this->target)));
+		} else {
+			$this->log_info(sprintf('Target "%s" not found', $this->target));
+
+			$do_mkadir = $this->confirm_boolean(sprintf('Create directory "%s"', $this->target));
+			if ($do_mkadir) {
+				if (!mkdir($this->target)) {
+					$this->log_error(sprintf('Cannot create directory "%s". Probably permission denied, you can create it by yourself.', $this->target));
+				}
+			} else {
+				$this->log_error('Exit');
+			}
+		}
+	}
+
+	// http://stackoverflow.com/a/8459443/3036312
+	public function copas($source)
+	{
+		if (is_file($source)) {
+			$this->disk($source);
+			return;
+		}
+
+		if (is_dir($source)) {
+			$dir = dir($source);
+			while (false !== ($entry = $dir->read())) { //copy one by one
+				if (in_array($entry, $this->copas_ignore)) continue;
+
+				$current_source = $source . '/' . $entry;
+
+				if (in_array($source, $this->copas_full_ignore)) continue;
+
+				$this->copas($current_source);
+			}
+			$dir->close();
+		// } else {
+			// $this->log_error(sprintf('"%s" is not directory'), $source);
+		}
+	}
+
+	// https://php.net/manual/en/function.file-put-contents.php#84180
+	public function disk($source)
+	{
+		$destination = $this->source2target_path($source);
+
+		$parts = explode('/', $destination);
+		$file = array_pop($parts);
+		$dest = array();
+		foreach ($parts as $part) {
+			array_push($dest, $part);
+			$curr_dest = implode('/', $dest);
+			if (!is_dir($curr_dest)) mkdir($curr_dest);
+		}
+
+		copy($source, $destination);
+	}
+
+	public function set_opt_by_type($key, $value)
+	{
+		if (in_array($key, $this->opts_source)) {
+			array_push($this->source, rtrim($value, '/\\'));
+			return true;
+		}
+		if (in_array($key, $this->opts_target)) {
+			$this->target = rtrim($value, '/\\');
+			return true;
+		}
+		return false;
+	}
+
+	public function is_optly($request)
+	{
+		return preg_match('/^(-[a-zA-Z0-9]|\-\-[a-zA-Z0-9]+)$/', $request) ? true : false;
+	}
+
+	public function source2target_path($source)
+	{
+		$parts = explode(DIRECTORY_SEPARATOR, $source);
+		foreach ($parts as $k => $v) {
+			if ($v === '..') $parts[$k] = null;
+		}
+		$clean_source = implode(DIRECTORY_SEPARATOR, array_filter($parts));
+		$destination = $this->target . DIRECTORY_SEPARATOR . $clean_source;
+		return $destination;
+	}
+
+	public function log_error($message = null)
+	{
+		if ($message !== null) {
+			$message = trim($message);
+			$this->log($message, ($message[strlen($message)-1] === '.' ? '' : '.'));
+		}
+		die();
+	}
+	public function log_info($message = null)
+	{
+		$this->log(rtrim($message, '.'), '...,');
+	}
+
+	public function log()
+	{
+		$args = func_get_args();
+		foreach ($args as $arg) {
+			echo $arg;
+		}
+		echo PHP_EOL;
+	}
+
+	public function confirm_boolean($message = null)
+	{
+		$message = trim($message);
+		echo $message, ($message[strlen($message)-1] === '?' ? '' : '?') , ' '; // add space between stdin
+
+		$cmd_handle = fopen("php://stdin", "r");
+		$cmd_uservoice = trim(strtolower(fgets($cmd_handle)));
+
+		return preg_match('/^(1|y)/', $cmd_uservoice) ? true : false;
+	}
+
+	public function __destruct()
+	{
+		clearstatcache();
+	}
+}
+
+$var = new CopasDisk($argv);
+
+// kurang efektif
+/*
+$opt_short = 't:';
+$opt_long = array('target:');
+$opt = getopt($opt_short, $opt_long);
+print_r($opt);
+echo PHP_EOL;
+*/
+
+// echo getcwd(), PHP_EOL;
+
+// print_r($argv);
+// echo PHP_EOL;
+
+/*
+function echo_cli($var = null) { echo $var, PHP_EOL; }
+$test_opts_regex = array(
+	'-x' => true,
+	'--foobar' => true,
+	'-x/' => false,
+	'--foobar/' => false
+);
+// Options are following getopt() allowed characters (azAZ09)
+foreach ($test_opts_regex as $opt => $result) {
+	$e = preg_match('/^(-[a-zA-Z0-9]|\-\-[a-zA-Z0-9]+)$/', $opt);
+	var_dump($e, $a);
+}
+die();
+*/
