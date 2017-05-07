@@ -6,7 +6,7 @@ class CopasDisk
 
 	public $opts_source = array('-s', '--source');
 	public $opts_target = array('-t', '--target');
-	public $opts_special = array('--help', '--version');
+	public $opts_special = array('--help', '--version', '--ignore'); // todo
 	public $opts;
 
 	public $copas_ignore = array('.', '..');
@@ -68,7 +68,7 @@ class CopasDisk
 	public function validate_contents()
 	{
 		foreach ($this->source as $source) {
-			$this->log('Copying: ', $source, ' => ', $this->source2target_path($source));
+			$this->log('Copy: ', $source, ' => ', $this->source2destination_path($source));
 			$this->copas($source);
 		}
 	}
@@ -101,7 +101,7 @@ class CopasDisk
 	// https://php.net/manual/en/function.file-put-contents.php#84180
 	public function disk($source)
 	{
-		$destination = $this->source2target_path($source);
+		$destination = $this->source2destination_path($source);
 
 		$parts = explode('/', $destination);
 		$file = array_pop($parts);
@@ -133,7 +133,7 @@ class CopasDisk
 		return preg_match('/^(-[a-zA-Z0-9]|\-\-[a-zA-Z0-9]+)$/', $request) ? true : false;
 	}
 
-	public function source2target_path($source)
+	public function source2destination_path($source)
 	{
 		$parts = explode(DIRECTORY_SEPARATOR, $source);
 		foreach ($parts as $k => $v) {
