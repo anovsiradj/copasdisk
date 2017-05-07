@@ -57,30 +57,9 @@ class CopasDisk
 			} elseif ($this->set_opt_by_type($type_opt, $request) === false) {
 				$this->log_error(sprintf('Not found option with key "%s" (trying set value to "%s")', $type_opt, $request));
 			}
-			/*
-			if ($type_opt === null) {
-				if (in_array($request, $this->opts)) {
-					$type_opt = $request;
-				} else {
-					$this->log_error(sprintf('Unknown first-option key "%s"', $request));
-				}
-				continue;
-			}
-
-			if (in_array($request, $this->opts)) {
-				$type_opt = $request;
-			} else {
-				if ($this->is_optly($request)) {
-					$type_opt = $request;
-				} elseif ($this->set_opt_by_type($type_opt, $request) === false) {
-					$this->log_error(sprintf('Not found option with key "%s" (trying set value to "%s")', $type_opt, $request));
-				}
-			}
-			*/
 		} // endforeach
 
 		if (!isset($this->target)) $this->log_error('Target is not set');
-
 		if (count($this->source) < 1) $this->log_error('Source is empty');
 
 		$this->validate_contents();
@@ -88,29 +67,9 @@ class CopasDisk
 
 	public function validate_contents()
 	{
-		// $this->execute_target();
-
 		foreach ($this->source as $source) {
 			$this->log('Copying: ', $source, ' => ', $this->source2target_path($source));
 			$this->copas($source);
-		}
-	}
-
-	public function execute_target()
-	{
-		if (file_exists($this->target) && is_dir($this->target)) {
-			$this->log_info(sprintf('Target "%s" Ok', realpath($this->target)));
-		} else {
-			$this->log_info(sprintf('Target "%s" not found', $this->target));
-
-			$do_mkadir = $this->confirm_boolean(sprintf('Create directory "%s"', $this->target));
-			if ($do_mkadir) {
-				if (!mkdir($this->target)) {
-					$this->log_error(sprintf('Cannot create directory "%s". Probably permission denied, you can create it by yourself.', $this->target));
-				}
-			} else {
-				$this->log_error('Exit');
-			}
 		}
 	}
 
@@ -220,6 +179,7 @@ class CopasDisk
 
 	public function __destruct()
 	{
+		// to uncache path
 		clearstatcache();
 	}
 }
