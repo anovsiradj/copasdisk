@@ -186,19 +186,6 @@ class CopasDisk
 
 $var = new CopasDisk($argv);
 
-// kurang efektif
-/*
-$opt_short = 't:';
-$opt_long = array('target:');
-$opt = getopt($opt_short, $opt_long);
-print_r($opt);
-echo PHP_EOL;
-*/
-
-// echo getcwd(), PHP_EOL;
-
-// print_r($argv);
-// echo PHP_EOL;
 
 /*
 function echo_cli($var = null) { echo $var, PHP_EOL; }
