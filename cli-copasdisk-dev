@@ -1,0 +1,6 @@
+#!/usr/bin/env php
+<?php
+require 'CopasDisk.php';
+
+$var = new anovsiradj\CopasDisk();
+$var->cli($argv);
